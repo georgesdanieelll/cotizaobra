@@ -19,6 +19,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <script src="./jspdf.umd.min.js"></script>
+<script src="./xlsx.full.min.js"></script>
 <style>
 /* Layout: sticky brand bar + scrollable tab rail; content in one 1140px column of cards. */
 :root{
@@ -1137,17 +1138,41 @@ function formImportar(){
     titulo:"Cargar materiales en lote",
     ancho:660,
     cuerpo:
-      '<p style="margin:0;color:var(--ink-2);font-size:14px">Copia las columnas desde Excel y pégalas aquí. Un material por línea, en este orden:</p>'
+      '<div class="card card-pad" style="background:var(--brand-soft);box-shadow:none;border:1px solid var(--brand-line);display:flex;flex-direction:column;gap:9px">'
+    + '<div class="eyebrow" style="color:var(--brand)">Subir el archivo</div>'
+    + '<label class="btn btn-primary" style="cursor:pointer;align-self:flex-start">Elegir archivo de Excel'
+    + '<input type="file" id="f_archivo" accept=".xlsx,.xls,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" hidden></label>'
+    + '<div class="hint" id="infoArchivo">Acepta .xlsx, .xls y .csv. Lee la primera hoja del libro.</div></div>'
+    + '<div class="eyebrow">Qué columnas tiene que tener</div>'
     + '<div class="card card-pad mono" style="background:var(--surface-2);box-shadow:none;font-size:12.5px;overflow-x:auto;white-space:nowrap">'
     + 'código &nbsp;|&nbsp; nombre en inventario &nbsp;|&nbsp; nombre comercial &nbsp;|&nbsp; especificaciones &nbsp;|&nbsp; categoría &nbsp;|&nbsp; unidad &nbsp;|&nbsp; costo &nbsp;|&nbsp; precio</div>'
-    + '<div class="hint">Separa con tabulación (lo que pega Excel), punto y coma o coma. Si quieres varias especificaciones en un mismo material, sepáralas con <b>|</b> dentro de esa columna. '
-    + 'El <b>nombre comercial</b> es el que ve el cliente; el de inventario queda interno y solo sirve para buscar. Si dejas el comercial vacío, se usa el de inventario. '
+    + '<div class="hint">Si la primera fila tiene encabezados, la app los reconoce y ubica cada columna aunque estén en otro orden. Si no hay encabezados, usa el orden de arriba. '
+    + 'Varias especificaciones en un mismo material se separan con <b>|</b>. '
+    + 'El <b>nombre comercial</b> es el que ve el cliente; el de inventario queda interno y solo sirve para buscar. '
     + 'Si el código ya existe, ese material se actualiza en vez de duplicarse.</div>'
-    + area("Pega aquí","f_bulk","","CLA-ACE-25\tCLV ACE CONC 2.1/2 CJ25KG IMP\tClavo de acero para concreto\tCAJA: 25 KG|TAMAÑOS: 2; 2 1/2\tHerrería\tCaja\t71,00\t83,50")
+    + area("O pega las filas directo desde Excel","f_bulk","","CLA-ACE-25\tCLV ACE CONC 2.1/2 CJ25KG IMP\tClavo de acero para concreto\tCAJA: 25 KG|TAMAÑOS: 2; 2 1/2\tHerrería\tCaja\t71,00\t83,50")
     + '<div id="prevImport"></div>',
     alAbrir: ()=>{
       const ta = document.getElementById("f_bulk");
-      ta.style.minHeight = "190px"; ta.style.fontFamily = "var(--f-mono)"; ta.style.fontSize = "12.5px";
+      ta.style.minHeight = "140px"; ta.style.fontFamily = "var(--f-mono)"; ta.style.fontSize = "12.5px";
+      const fa = document.getElementById("f_archivo");
+      fa.onchange = async ()=>{
+        const f = fa.files && fa.files[0]; if (!f) return;
+        const info = document.getElementById("infoArchivo");
+        info.textContent = "Leyendo " + f.name + "...";
+        try {
+          const filas = await leerArchivoMateriales(f);
+          if (!filas.length){ info.textContent = "El archivo no tiene filas con datos."; return; }
+          ta.value = filas.map(r=>r.map(c=>String(c==null?"":c).replace(/\t/g," ")).join("\t")).join("\n");
+          ta.dispatchEvent(new Event("input"));
+          info.textContent = f.name + " · " + filas.length + (filas.length===1?" fila leída":" filas leídas");
+        } catch(e){
+          info.textContent = (e && e.message === "sin-libreria")
+            ? "No se pudo cargar el lector de Excel. Guarda tu archivo como .csv e inténtalo otra vez."
+            : "No se pudo leer ese archivo. Revisa que sea un Excel o un CSV.";
+        }
+        fa.value = "";
+      };
       ta.oninput = ()=>{
         const r = parsearLote(ta.value);
         const caja = document.getElementById("prevImport");
@@ -1155,6 +1180,9 @@ function formImportar(){
         const sinPrecio = r.filter(x=>!x.precio).length;
         const sinCosto  = r.filter(x=>!x.costo).length;
         caja.innerHTML = '<div class="pill pill-ok">Se cargarán '+r.length+(r.length===1?' material':' materiales')+'</div>'
+          + (modoLote === "encabezados"
+              ? '<div class="hint" style="margin-top:7px">Reconocí los encabezados de tu archivo y ubiqué cada columna por su nombre.</div>'
+              : '<div class="hint" style="margin-top:7px">No hay encabezados, así que estoy usando el orden de las columnas. Revisa abajo que haya quedado bien.</div>')
           + (sinPrecio ? '<div class="banner" style="margin-top:9px"><div><strong>'+sinPrecio+' sin precio de venta.</strong> Revisa que la última columna sea el precio: si te saltaste una columna, los números se corren.</div></div>' : "")
           + (!sinPrecio && sinCosto ? '<div class="hint" style="margin-top:7px">'+sinCosto+' sin costo. Se cargan igual y les pones el costo después.</div>' : "")
           + '<div class="eyebrow" style="margin-top:11px;margin-bottom:5px">Así quedó la primera fila</div>'
@@ -1187,24 +1215,126 @@ function formImportar(){
     }
   });
 }
-function parsearLote(txt){
-  const out = [];
-  String(txt||"").split(/\r?\n/).forEach(linea=>{
-    if (!linea.trim()) return;
-    let c = linea.includes("\t") ? linea.split("\t") : (linea.includes(";") ? linea.split(";") : linea.split(","));
-    c = c.map(x=>String(x).trim().replace(/^"(.*)"$/,"$1"));
-    if (/^(c[oó]digo|codigo)$/i.test(c[0]||"")) return;
-    const nombreInterno = (c[1]||"").trim();
-    const nombre = (c[2]||"").trim() || nombreInterno || (c[0]||"").trim();
-    if (!nombre) return;
-    out.push({
-      codigo:(c[0]||"").toUpperCase(), nombreInv:nombreInterno, nombre,
-      especificacion:String(c[3]||"").split("|").map(x=>x.trim()).filter(Boolean).join("\n"),
-      categoria:c[4]||"", unidad:c[5]||"Unidad",
-      costo:parseNum(c[6]), precio:parseNum(c[7])
-    });
+/* ---------- lectura de archivos y texto para la carga en lote ---------- */
+const ORDEN_COLS = ["codigo","nombreInv","nombre","especificacion","categoria","unidad","costo","precio"];
+const CAMPOS_ENCAB = [
+  {k:"codigo",         re:/c[oó]digo|sku|referencia|^ref\b/i},
+  {k:"nombreInv",      re:/inventario|interno|sistema/i},
+  {k:"nombre",         re:/comercial/i},
+  {k:"especificacion", re:/especific/i},
+  {k:"categoria",      re:/categor|familia|l[ií]nea|rubro/i},
+  {k:"unidad",         re:/unidad|medida|presentaci/i},
+  {k:"costo",          re:/costo|coste/i},
+  {k:"precio",         re:/precio|venta|pvp/i}
+];
+let modoLote = "";   // "encabezados" u "orden", para avisar en la vista previa
+
+function partirCSV(linea, sep){
+  const out = []; let cur = "", q = false;
+  for (let i=0;i<linea.length;i++){
+    const ch = linea[i];
+    if (q){
+      if (ch === '"'){ if (linea[i+1] === '"'){ cur += '"'; i++; } else q = false; }
+      else cur += ch;
+    } else if (ch === '"'){ q = true; }
+    else if (ch === sep){ out.push(cur); cur = ""; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out.map(x=>x.trim());
+}
+function textoAFilas(txt){
+  const lineas = String(txt||"").replace(/^﻿/,"").split(/\r?\n/).filter(l=>l.trim());
+  const muestra = lineas[0] || "";
+  if (muestra.includes("\t")) return lineas.map(l=> l.split("\t").map(x=>x.trim()));
+  const sep = (muestra.split(";").length > muestra.split(",").length) ? ";" : ",";
+  return lineas.map(l=> partirCSV(l, sep));
+}
+function esEncabezado(fila){
+  let n = 0;
+  (fila||[]).forEach(c=>{
+    if (/c[oó]digo|nombre|descripci|especific|categor|unidad|medida|costo|precio|venta/i.test(String(c||""))) n++;
   });
+  return n >= 2;
+}
+function mapearColumnas(fila){
+  const mapa = {};
+  (fila||[]).forEach((celda,i)=>{
+    const t = String(celda||"").trim();
+    if (!t) return;
+    for (const c of CAMPOS_ENCAB){
+      if (mapa[c.k] !== undefined) continue;
+      if (c.re.test(t)){ mapa[c.k] = i; return; }
+    }
+  });
+  if (mapa.nombre === undefined){
+    const usadas = Object.keys(mapa).map(k=>mapa[k]);
+    (fila||[]).forEach((celda,i)=>{
+      if (mapa.nombre !== undefined || usadas.indexOf(i) >= 0) return;
+      if (/nombre|descripci|material|producto|art[ií]culo/i.test(String(celda||""))) mapa.nombre = i;
+    });
+  }
+  return mapa;
+}
+function filaAMaterial(fila, mapa){
+  const get = k => {
+    const i = mapa ? mapa[k] : ORDEN_COLS.indexOf(k);
+    if (i === undefined || i < 0) return "";
+    return String(fila[i]==null ? "" : fila[i]).trim();
+  };
+  const nombreInterno = get("nombreInv");
+  const nombre = get("nombre") || nombreInterno || get("codigo");
+  if (!nombre) return null;
+  return {
+    codigo: get("codigo").toUpperCase(),
+    nombreInv: nombreInterno,
+    nombre,
+    especificacion: get("especificacion").split(/[|\n]/).map(x=>x.trim()).filter(Boolean).join("\n"),
+    categoria: get("categoria"),
+    unidad: get("unidad") || "Unidad",
+    costo: parseNum(get("costo")),
+    precio: parseNum(get("precio"))
+  };
+}
+function parsearFilas(filas){
+  const out = [];
+  filas = (filas||[]).filter(f => f && f.some(c => String(c==null?"":c).trim() !== ""));
+  if (!filas.length){ modoLote = ""; return out; }
+  let mapa = null;
+  if (esEncabezado(filas[0])){
+    const m = mapearColumnas(filas[0]);
+    if (Object.keys(m).length >= 3) mapa = m;
+    filas = filas.slice(1);
+    modoLote = mapa ? "encabezados" : "orden";
+  } else {
+    modoLote = "orden";
+  }
+  filas.forEach(f=>{ const mat = filaAMaterial(f, mapa); if (mat) out.push(mat); });
   return out;
+}
+function parsearLote(txt){ return parsearFilas(textoAFilas(txt)); }
+
+/* lee .xlsx, .xls, .csv o .txt y devuelve filas */
+function leerArchivoMateriales(file){
+  return new Promise((res,rej)=>{
+    const nom = String(file.name||"").toLowerCase();
+    const fr = new FileReader();
+    fr.onerror = ()=> rej(new Error("archivo"));
+    if (/\.(csv|txt|tsv)$/.test(nom)){
+      fr.onload = ()=> res(textoAFilas(String(fr.result||"")));
+      fr.readAsText(file, "utf-8");
+      return;
+    }
+    if (!window.XLSX){ rej(new Error("sin-libreria")); return; }
+    fr.onload = ()=>{
+      try {
+        const wb = XLSX.read(new Uint8Array(fr.result), {type:"array"});
+        const hoja = wb.Sheets[wb.SheetNames[0]];
+        res(XLSX.utils.sheet_to_json(hoja, {header:1, blankrows:false, raw:false, defval:""}));
+      } catch(e){ rej(new Error("lectura")); }
+    };
+    fr.readAsArrayBuffer(file);
+  });
 }
 
 /* ---------- documentos ---------- */

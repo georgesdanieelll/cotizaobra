@@ -2,12 +2,13 @@
    La app se guarda en el equipo para funcionar sin internet.
    La página principal se busca primero en la red, así las actualizaciones
    entran solas cuando hay conexión, y se usa la copia guardada si no la hay. */
-const VERSION = "cotizaobra-v3";
+const VERSION = "cotizaobra-v4";
 const BASICOS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./jspdf.umd.min.js",
+  "./xlsx.full.min.js",
   "./icon-192.png",
   "./icon-512.png",
   "./apple-touch-icon.png"
