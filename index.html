@@ -1024,17 +1024,19 @@ function vMateriales(){
   + cats.map(c=>'<option value="'+esc(c)+'"'+(filtros.matCat===c?" selected":"")+'>'+esc(c)+'</option>').join("")+'</select></div>'
   + (lista.length ? '<div class="tablewrap"><table><thead><tr><th></th><th>Material</th><th>Und</th><th class="r">Costo</th><th class="r">Precio</th><th class="r">Margen</th><th></th></tr></thead><tbody>'
       + lista.map(m=>{
+          const sinCosto = !Number(m.costo);
           const mg = margen(m);
-          const cls = mg<10 ? "pill-warn" : (mg>=25 ? "pill-ok" : "pill");
+          const cls = sinCosto ? "pill" : (mg<10 ? "pill-warn" : (mg>=25 ? "pill-ok" : "pill"));
+          const txtMg = sinCosto ? "—" : fmt(mg,1)+"%";
           const sp = specLineas(m);
           return '<tr><td style="width:56px">'+miniatura(m)+'</td>'
-          + '<td><div class="tname">'+esc(nombreCom(m))+(m.ejemplo?' <span class="pill pill-ex">ejemplo</span>':"")+'</div>'
+          + '<td><div class="tname">'+esc(nombreCom(m))+(m.ejemplo?' <span class="pill pill-ex">ejemplo</span>':"")+(!Number(m.precio)?' <span class="pill pill-warn">sin precio</span>':"")+'</div>'
           + '<div class="tsub mono">'+esc(m.codigo||"N/A")+(nombreInv(m)?'  ·  '+esc(nombreInv(m)):"")+'</div>'
           + '<div class="tsub">'+esc(sp.join(" · ")||"—")+(m.categoria?' · '+esc(m.categoria):"")+'</div></td>'
           + '<td>'+esc(m.unidad||"—")+'</td>'
-          + '<td class="r num">'+usd(m.costo)+'</td>'
+          + '<td class="r num">'+(sinCosto?'<span class="hint">falta</span>':usd(m.costo))+'</td>'
           + '<td class="r num" style="font-weight:600">'+usd(m.precio)+'</td>'
-          + '<td class="r"><span class="pill '+cls+'">'+fmt(mg,1)+'%</span></td>'
+          + '<td class="r"><span class="pill '+cls+'" title="'+(sinCosto?"Carga el costo para ver el margen":"")+'">'+txtMg+'</span></td>'
           + '<td class="r"><button class="btn btn-sm btn-ghost" data-edit="'+m.id+'">Editar</button></td></tr>';
         }).join("")
       + '</tbody></table></div>'
@@ -1084,9 +1086,12 @@ function formMaterial(m){
     alAbrir: ()=>{
       const upd = ()=>{
         const c = parseNum(val("f_costo")), p = parseNum(val("f_precio"));
-        const mg = p ? ((p-c)/p)*100 : 0;
-        document.getElementById("prevMargen").textContent = p ? fmt(mg,1)+"%" : "—";
-        document.getElementById("prevGanancia").textContent = p ? ("Ganas " + usd(p-c) + " por " + String(val("f_und")||"unidad").toLowerCase()) : "Carga el precio de venta para ver el margen";
+        const mg = (p && c) ? ((p-c)/p)*100 : 0;
+        document.getElementById("prevMargen").textContent = (p && c) ? fmt(mg,1)+"%" : "—";
+        document.getElementById("prevGanancia").textContent = !p
+          ? "Carga el precio de venta para ver el margen"
+          : (!c ? "Carga el costo cuando lo tengas y aquí te sale el margen"
+                : ("Ganas " + usd(p-c) + " por " + String(val("f_und")||"unidad").toLowerCase()));
       };
       ["f_costo","f_precio","f_und"].forEach(id=>{ const e=document.getElementById(id); e.oninput=upd; e.onchange=upd; });
       upd();
@@ -1145,9 +1150,25 @@ function formImportar(){
       ta.style.minHeight = "190px"; ta.style.fontFamily = "var(--f-mono)"; ta.style.fontSize = "12.5px";
       ta.oninput = ()=>{
         const r = parsearLote(ta.value);
-        document.getElementById("prevImport").innerHTML = r.length
-          ? '<div class="pill pill-ok">Se cargarán '+r.length+' materiales</div>'
-          : '<div class="hint">Nada que cargar todavía.</div>';
+        const caja = document.getElementById("prevImport");
+        if (!r.length){ caja.innerHTML = '<div class="hint">Nada que cargar todavía.</div>'; return; }
+        const sinPrecio = r.filter(x=>!x.precio).length;
+        const sinCosto  = r.filter(x=>!x.costo).length;
+        caja.innerHTML = '<div class="pill pill-ok">Se cargarán '+r.length+(r.length===1?' material':' materiales')+'</div>'
+          + (sinPrecio ? '<div class="banner" style="margin-top:9px"><div><strong>'+sinPrecio+' sin precio de venta.</strong> Revisa que la última columna sea el precio: si te saltaste una columna, los números se corren.</div></div>' : "")
+          + (!sinPrecio && sinCosto ? '<div class="hint" style="margin-top:7px">'+sinCosto+' sin costo. Se cargan igual y les pones el costo después.</div>' : "")
+          + '<div class="eyebrow" style="margin-top:11px;margin-bottom:5px">Así quedó la primera fila</div>'
+          + '<div class="card card-pad" style="background:var(--surface-2);box-shadow:none;font-size:13px;display:flex;flex-direction:column;gap:3px">'
+          + [["Código", r[0].codigo||"(vacío)"],
+             ["Nombre en inventario", r[0].nombreInv||"(vacío)"],
+             ["Nombre comercial", r[0].nombre],
+             ["Especificaciones", specLineas(r[0]).join(" · ")||"(vacío)"],
+             ["Categoría", r[0].categoria||"(vacío)"],
+             ["Unidad", r[0].unidad||"(vacío)"],
+             ["Costo", r[0].costo?usd(r[0].costo):"(vacío)"],
+             ["Precio", r[0].precio?usd(r[0].precio):"(vacío)"]]
+            .map(f=>'<div><span style="color:var(--ink-3);font-weight:600">'+f[0]+':</span> '+esc(f[1])+'</div>').join("")
+          + '</div>';
       };
     },
     textoGuardar:"Cargar",
