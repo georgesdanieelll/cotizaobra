@@ -238,8 +238,8 @@ const AJUSTES_DEF = {
 };
 
 function semilla(){
-  const m = (codigo,nombre,especificacion,categoria,unidad,costo,precio)=>
-    ({id:uid(),codigo,nombre,especificacion,categoria,unidad,costo,precio,activo:true,ejemplo:true});
+  const m = (codigo,nombreInv,nombre,especificacion,categoria,unidad,costo,precio)=>
+    ({id:uid(),codigo,nombreInv,nombre,especificacion,categoria,unidad,costo,precio,activo:true,ejemplo:true});
   return {
     version:2,
     ajustes:{...AJUSTES_DEF},
@@ -248,16 +248,16 @@ function semilla(){
       {id:uid(),nombre:"Ferretería El Tornillo",rif:"J-30987654-1",contacto:"Sra. Marta Rojas",telefono:"0424-7654321",email:"",direccion:"Catia, Caracas",notas:"Compra por volumen cada 15 días.",ejemplo:true}
     ],
     materiales:[
-      m("CLA-ACE-25","Clavo de acero para concreto","CAJA: 25 KG\nTAMAÑOS: 2; 2 1/2","Herrería","Caja",71.00,83.50),
-      m("CLA-D48-25","Clavo dulce 4 x 8","CAJA: 25 KG\nCALIBRE: 8","Herrería","Caja",38.00,44.60),
-      m("CLA-D25-25","Clavo dulce 2 1/2 x 12","CAJA: 25 KG\nCALIBRE: 12","Herrería","Caja",38.00,44.60),
-      m("ALA-GAL-50","Bobina de alambre dulce galvanizado","PESO: 50 KG","Herrería","Bobina",55.00,65.60),
-      m("ELE-7018","Electrodo 7018 Welding","UNIDAD: KG","Herrería","kg",1.55,2.00),
-      m("CEM-001","Cemento gris tipo I","SACO: 42,5 KG","Cemento y agregados","Saco",5.10,6.20),
-      m("ARE-010","Arena lavada","GRANULOMETRÍA: fina\nPRESENTACIÓN: a granel","Cemento y agregados","m³",17.00,24.00),
-      m("DRY-012","Lámina de drywall 1/2\"","MEDIDA: 1,22 x 2,44 m\nTIPO: regular","Drywall","Lámina",8.20,10.50),
-      m("MAS-028","Masilla para drywall","CUÑETE: 28 KG\nUSO: general","Drywall","Cuñete",15.50,21.00),
-      m("POL-030","Lámina de poliuretano","ESPESOR: 30 mm","Techos","Lámina",26.00,30.50)
+      m("CLA-ACE-25","CLV ACE CONC 2.1/2 CJ25KG IMP","Clavo de acero para concreto","CAJA: 25 KG\nTAMAÑOS: 2; 2 1/2","Herrería","Caja",71.00,83.50),
+      m("CLA-D48-25","CLV DLC 4X8 C8 CJ25KG","Clavo dulce 4 x 8","CAJA: 25 KG\nCALIBRE: 8","Herrería","Caja",38.00,44.60),
+      m("CLA-D25-25","CLV DLC 2.1/2X12 C12 CJ25KG","Clavo dulce 2 1/2 x 12","CAJA: 25 KG\nCALIBRE: 12","Herrería","Caja",38.00,44.60),
+      m("ALA-GAL-50","ALMB DLC GALV BOB 50KG","Bobina de alambre dulce galvanizado","PESO: 50 KG","Herrería","Bobina",55.00,65.60),
+      m("ELE-7018","ELECT 7018 WLD 1/8 KG","Electrodo 7018 Welding","UNIDAD: KG","Herrería","kg",1.55,2.00),
+      m("CEM-001","CEM GRS T1 SC42.5KG","Cemento gris tipo I","SACO: 42,5 KG","Cemento y agregados","Saco",5.10,6.20),
+      m("ARE-010","ARE LAV FIN M3 GRAN","Arena lavada","GRANULOMETRÍA: fina\nPRESENTACIÓN: a granel","Cemento y agregados","m³",17.00,24.00),
+      m("DRY-012","LAM DRY 1/2 122X244 REG","Lámina de drywall 1/2\"","MEDIDA: 1,22 x 2,44 m\nTIPO: regular","Drywall","Lámina",8.20,10.50),
+      m("MAS-028","MAS DRY CUÑ 28KG GRAL","Masilla para drywall","CUÑETE: 28 KG\nUSO: general","Drywall","Cuñete",15.50,21.00),
+      m("POL-030","LAM POLIURET 30MM","Lámina de poliuretano","ESPESOR: 30 mm","Techos","Lámina",26.00,30.50)
     ],
     documentos:[]
   };
@@ -369,6 +369,13 @@ function fechaLarga(iso){
 }
 function norm(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,""); }
 function specLineas(m){ return String(m.especificacion||"").split("\n").map(x=>x.trim()).filter(Boolean); }
+/* el nombre comercial es el que se imprime; si falta, se usa el de inventario */
+function nombreCom(m){ return String(m.nombre||"").trim() || String(m.nombreInv||"").trim(); }
+/* solo para la app: el nombre interno, nunca sale en los PDF */
+function nombreInv(m){
+  const i = String(m.nombreInv||"").trim();
+  return (i && i !== String(m.nombre||"").trim()) ? i : "";
+}
 function margen(mat){
   const c = Number(mat.costo)||0, p = Number(mat.precio)||0;
   return p ? ((p-c)/p)*100 : 0;
@@ -521,7 +528,7 @@ function tablaRenglones(doc, y, items){
   cabecera();
   items.forEach((it,i)=>{
     const f = {
-      n:String(i+1), cod:it.codigo||"N/A", desc:it.nombre||"",
+      n:String(i+1), cod:it.codigo||"N/A", desc:nombreCom(it),
       cant:fmt(it.cantidad, (Number(it.cantidad)%1===0)?0:2),
       pu:usd(it.precio), tot:usd((Number(it.cantidad)||0)*(Number(it.precio)||0))
     };
@@ -713,7 +720,7 @@ async function pdfCatalogo(mats, o){
       doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(255,255,255);
       doc.text(String(cat).toUpperCase(), PG.M + PG.CW/2, y+6.2, {align:"center"});
       y += 12;
-      const lista = porCat[cat].slice().sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),"es"));
+      const lista = porCat[cat].slice().sort((a,b)=>nombreCom(a).localeCompare(nombreCom(b),"es"));
       for (let i=0;i<lista.length;i++){
         const cIdx = i % COLS;
         if (cIdx === 0 && i > 0){ y += CH + GAP; }
@@ -744,8 +751,8 @@ async function pdfCatalogo(mats, o){
       doc.setFont("helvetica","bold"); doc.setFontSize(8.6); tx(doc,C.brand);
       doc.text(String(cat).toUpperCase(), PG.M+padX, y+5.2);
       y += 7.5;
-      porCat[cat].slice().sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),"es")).forEach((m,i)=>{
-        const f = {cod:m.codigo||"N/A", desc:m.nombre||"", und:m.unidad||"", pre:usd(m.precio)};
+      porCat[cat].slice().sort((a,b)=>nombreCom(a).localeCompare(nombreCom(b),"es")).forEach((m,i)=>{
+        const f = {cod:m.codigo||"N/A", desc:nombreCom(m), und:m.unidad||"", pre:usd(m.precio)};
         doc.setFont("helvetica","normal"); doc.setFontSize(9);
         const wrap = cols.map(c=> doc.splitTextToSize(String(f[c.k]), c.w-padX*2));
         const nl = Math.max.apply(null, wrap.map(w=>w.length));
@@ -786,7 +793,7 @@ function ficha(doc, x, y, w, h, m){
   } else marcoVacio(doc, ix, iy, L);
   let yy = y + 3 + L + 5;
   doc.setFont("helvetica","bold"); doc.setFontSize(7.4); tx(doc,C.ink);
-  const nm = doc.splitTextToSize(String(m.nombre||"").toUpperCase(), w-8).slice(0,2);
+  const nm = doc.splitTextToSize(nombreCom(m).toUpperCase(), w-8).slice(0,2);
   nm.forEach((l,i)=> doc.text(l, x+4, yy+i*3.2));
   yy += nm.length*3.2 + 1.6;
   doc.setFont("helvetica","normal"); doc.setFontSize(6.4); tx(doc,C.ink3);
@@ -1002,8 +1009,8 @@ function vMateriales(){
   const q = norm(filtros.mat);
   const lista = S.materiales.filter(m=>{
     if (filtros.matCat && m.categoria !== filtros.matCat) return false;
-    return !q || norm([m.codigo,m.nombre,m.especificacion,m.categoria].join(" ")).includes(q);
-  }).sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),"es"));
+    return !q || norm([m.codigo,m.nombre,m.nombreInv,m.especificacion,m.categoria].join(" ")).includes(q);
+  }).sort((a,b)=>nombreCom(a).localeCompare(nombreCom(b),"es"));
   const cats = categorias();
   return '<div class="sec">'
   + '<div class="sec-head"><div><div class="eyebrow">Base de datos</div><h2>Materiales</h2>'
@@ -1021,8 +1028,8 @@ function vMateriales(){
           const cls = mg<10 ? "pill-warn" : (mg>=25 ? "pill-ok" : "pill");
           const sp = specLineas(m);
           return '<tr><td style="width:56px">'+miniatura(m)+'</td>'
-          + '<td><div class="tname">'+esc(m.nombre)+(m.ejemplo?' <span class="pill pill-ex">ejemplo</span>':"")+'</div>'
-          + '<div class="tsub mono">'+esc(m.codigo||"N/A")+'</div>'
+          + '<td><div class="tname">'+esc(nombreCom(m))+(m.ejemplo?' <span class="pill pill-ex">ejemplo</span>':"")+'</div>'
+          + '<div class="tsub mono">'+esc(m.codigo||"N/A")+(nombreInv(m)?'  ·  '+esc(nombreInv(m)):"")+'</div>'
           + '<div class="tsub">'+esc(sp.join(" · ")||"—")+(m.categoria?' · '+esc(m.categoria):"")+'</div></td>'
           + '<td>'+esc(m.unidad||"—")+'</td>'
           + '<td class="r num">'+usd(m.costo)+'</td>'
@@ -1045,7 +1052,7 @@ function cxMateriales(){
 const UNIDADES = ["Unidad","Caja","Saco","Bobina","Rollo","Lámina","Barra","Tubo","Pieza","Cuñete","Galón","Litro","kg","m","m²","m³","Paleta","Juego","Par"];
 function formMaterial(m){
   const n = !m;
-  m = m || {id:uid(),codigo:"",nombre:"",especificacion:"",categoria:"",unidad:"Unidad",costo:0,precio:0,activo:true};
+  m = m || {id:uid(),codigo:"",nombreInv:"",nombre:"",especificacion:"",categoria:"",unidad:"Unidad",costo:0,precio:0,activo:true};
   const cats = categorias();
   abrirDrawer({
     titulo: n?"Nuevo material":"Editar material",
@@ -1062,7 +1069,10 @@ function formMaterial(m){
       + UNIDADES.map(u=>'<option'+(u===m.unidad?" selected":"")+'>'+esc(u)+'</option>').join("")
       + (m.unidad && UNIDADES.indexOf(m.unidad)<0 ? '<option selected>'+esc(m.unidad)+'</option>' : "")
       + '</select></label></div>'
-    + campo("Nombre del material","text","f_nom",m.nombre,"Clavo de acero para concreto")
+    + campo("Nombre en tu inventario","text","f_nomInv",m.nombreInv,"CLV ACE CONC 2.1/2 CJ25KG IMP")
+    + '<div class="hint" style="margin-top:-6px">Interno. Solo se usa para que lo consigas al buscar; nunca sale impreso.</div>'
+    + campo("Nombre comercial","text","f_nom",m.nombre,"Clavo de acero para concreto")
+    + '<div class="hint" style="margin-top:-6px">Este es el que ve el cliente en el catálogo, la cotización y la nota de venta.</div>'
     + area("Especificaciones — una por línea","f_esp",m.especificacion,"CAJA: 25 KG\nTAMAÑOS: 2; 2 1/2")
     + '<label class="f"><span>Categoría</span><input type="text" id="f_cat" list="listaCats" value="'+esc(m.categoria)+'" placeholder="Herrería">'
     + '<datalist id="listaCats">'+cats.map(c=>'<option value="'+esc(c)+'"></option>').join("")+'</datalist></label>'
@@ -1098,14 +1108,15 @@ function formMaterial(m){
       };
     },
     borrar: n?null:async ()=>{
-      if (!await confirmar("Eliminar material","Se elimina "+m.nombre+" de tu base de datos.","Eliminar")) return false;
+      if (!await confirmar("Eliminar material","Se elimina "+nombreCom(m)+" de tu base de datos.","Eliminar")) return false;
       await fotoBorrar(m.id);
       S.materiales = S.materiales.filter(x=>x.id!==m.id); guardar(); toast("Material eliminado."); return true;
     },
     guardar: ()=>{
-      const nombre = val("f_nom").trim();
-      if (!nombre){ toast("El nombre del material es obligatorio."); return false; }
-      const o = {...m, codigo:val("f_cod").trim().toUpperCase(), nombre, especificacion:val("f_esp").trim(),
+      const nombreInterno = val("f_nomInv").trim();
+      const nombre = val("f_nom").trim() || nombreInterno;
+      if (!nombre){ toast("Ponle al menos un nombre, comercial o de inventario."); return false; }
+      const o = {...m, codigo:val("f_cod").trim().toUpperCase(), nombreInv:nombreInterno, nombre, especificacion:val("f_esp").trim(),
         categoria:val("f_cat").trim(), unidad:val("f_und"), costo:parseNum(val("f_costo")), precio:parseNum(val("f_precio")),
         activo:document.getElementById("f_act").checked};
       delete o.ejemplo;
@@ -1123,9 +1134,11 @@ function formImportar(){
     cuerpo:
       '<p style="margin:0;color:var(--ink-2);font-size:14px">Copia las columnas desde Excel y pégalas aquí. Un material por línea, en este orden:</p>'
     + '<div class="card card-pad mono" style="background:var(--surface-2);box-shadow:none;font-size:12.5px;overflow-x:auto;white-space:nowrap">'
-    + 'código &nbsp;|&nbsp; nombre &nbsp;|&nbsp; especificaciones &nbsp;|&nbsp; categoría &nbsp;|&nbsp; unidad &nbsp;|&nbsp; costo &nbsp;|&nbsp; precio</div>'
-    + '<div class="hint">Separa con tabulación (lo que pega Excel), punto y coma o coma. Si quieres varias especificaciones en un mismo material, sepáralas con <b>|</b> dentro de esa columna. Solo el nombre es obligatorio. Si el código ya existe, ese material se actualiza en vez de duplicarse.</div>'
-    + area("Pega aquí","f_bulk","","CLA-ACE-25\tClavo de acero para concreto\tCAJA: 25 KG|TAMAÑOS: 2; 2 1/2\tHerrería\tCaja\t71,00\t83,50")
+    + 'código &nbsp;|&nbsp; nombre en inventario &nbsp;|&nbsp; nombre comercial &nbsp;|&nbsp; especificaciones &nbsp;|&nbsp; categoría &nbsp;|&nbsp; unidad &nbsp;|&nbsp; costo &nbsp;|&nbsp; precio</div>'
+    + '<div class="hint">Separa con tabulación (lo que pega Excel), punto y coma o coma. Si quieres varias especificaciones en un mismo material, sepáralas con <b>|</b> dentro de esa columna. '
+    + 'El <b>nombre comercial</b> es el que ve el cliente; el de inventario queda interno y solo sirve para buscar. Si dejas el comercial vacío, se usa el de inventario. '
+    + 'Si el código ya existe, ese material se actualiza en vez de duplicarse.</div>'
+    + area("Pega aquí","f_bulk","","CLA-ACE-25\tCLV ACE CONC 2.1/2 CJ25KG IMP\tClavo de acero para concreto\tCAJA: 25 KG|TAMAÑOS: 2; 2 1/2\tHerrería\tCaja\t71,00\t83,50")
     + '<div id="prevImport"></div>',
     alAbrir: ()=>{
       const ta = document.getElementById("f_bulk");
@@ -1160,13 +1173,14 @@ function parsearLote(txt){
     let c = linea.includes("\t") ? linea.split("\t") : (linea.includes(";") ? linea.split(";") : linea.split(","));
     c = c.map(x=>String(x).trim().replace(/^"(.*)"$/,"$1"));
     if (/^(c[oó]digo|codigo)$/i.test(c[0]||"")) return;
-    const nombre = (c[1]||c[0]||"").trim();
+    const nombreInterno = (c[1]||"").trim();
+    const nombre = (c[2]||"").trim() || nombreInterno || (c[0]||"").trim();
     if (!nombre) return;
     out.push({
-      codigo:(c[0]||"").toUpperCase(), nombre,
-      especificacion:String(c[2]||"").split("|").map(x=>x.trim()).filter(Boolean).join("\n"),
-      categoria:c[3]||"", unidad:c[4]||"Unidad",
-      costo:parseNum(c[5]), precio:parseNum(c[6])
+      codigo:(c[0]||"").toUpperCase(), nombreInv:nombreInterno, nombre,
+      especificacion:String(c[3]||"").split("|").map(x=>x.trim()).filter(Boolean).join("\n"),
+      categoria:c[4]||"", unidad:c[5]||"Unidad",
+      costo:parseNum(c[6]), precio:parseNum(c[7])
     });
   });
   return out;
@@ -1291,8 +1305,8 @@ function vEditor(){
 function filaItem(it,i){
   const sp = specLineas(it);
   return '<div class="itemrow" data-i="'+i+'">'
-  + '<div class="cel-desc"><div class="tname">'+esc(it.nombre)+'</div>'
-  + '<div class="tsub">'+esc([it.codigo||"N/A", sp.join(" · "), it.unidad].filter(Boolean).join(" · "))+'</div></div>'
+  + '<div class="cel-desc"><div class="tname">'+esc(nombreCom(it))+'</div>'
+  + '<div class="tsub">'+esc([it.codigo||"N/A", nombreInv(it), sp.join(" · "), it.unidad].filter(Boolean).join(" · "))+'</div></div>'
   + '<div><div class="lbl">Cantidad</div><input type="number" step="0.01" min="0" data-f="cantidad" value="'+esc(it.cantidad)+'" style="text-align:right"></div>'
   + '<div><div class="lbl">Precio unitario</div><input type="number" step="0.01" min="0" data-f="precio" value="'+esc(it.precio)+'" style="text-align:right"></div>'
   + '<div class="cel-tot r"><div class="lbl">Precio total</div><span class="num" data-tot style="font-weight:600">'+usd((Number(it.cantidad)||0)*(Number(it.precio)||0))+'</span></div>'
@@ -1431,13 +1445,13 @@ function elegirMateriales(){
         const l = S.materiales.filter(m=>{
           if (m.activo===false) return false;
           if (cat && m.categoria!==cat) return false;
-          return !nq || norm([m.codigo,m.nombre,m.especificacion].join(" ")).includes(nq);
-        }).sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),"es"));
+          return !nq || norm([m.codigo,m.nombre,m.nombreInv,m.especificacion].join(" ")).includes(nq);
+        }).sort((a,b)=>nombreCom(a).localeCompare(nombreCom(b),"es"));
         pl.innerHTML = l.length ? l.map(m=>'<div class="pickrow" data-id="'+m.id+'">'
           + '<input type="checkbox" '+(sel[m.id]?"checked":"")+' style="width:auto;flex:none" tabindex="-1">'
           + miniatura(m)
-          + '<div style="min-width:0;flex:1"><div class="tname">'+esc(m.nombre)+'</div>'
-          + '<div class="tsub">'+esc([m.codigo||"N/A", specLineas(m).join(" · ")].filter(Boolean).join(" · "))+'</div></div>'
+          + '<div style="min-width:0;flex:1"><div class="tname">'+esc(nombreCom(m))+'</div>'
+          + '<div class="tsub">'+esc([m.codigo||"N/A", nombreInv(m), specLineas(m).join(" · ")].filter(Boolean).join(" · "))+'</div></div>'
           + '<div class="num" style="font-weight:600;white-space:nowrap;text-align:right">'+usd(m.precio)+'<div class="tsub">'+esc(m.unidad||"")+'</div></div></div>').join("")
           : '<div class="empty" style="padding:20px"><strong>Sin resultados</strong>Revisa el buscador o la categoría.</div>';
         pl.querySelectorAll("[data-id]").forEach(r=> r.onclick = ()=>{
@@ -1458,8 +1472,8 @@ function elegirMateriales(){
         const m = S.materiales.find(x=>x.id===id); if(!m) return;
         const ya = editor.items.find(it=>it.materialId===id);
         if (ya){ ya.cantidad = (Number(ya.cantidad)||0) + 1; return; }
-        editor.items.push({materialId:m.id, codigo:m.codigo, nombre:m.nombre, especificacion:m.especificacion,
-          unidad:m.unidad, cantidad:1, precio:Number(m.precio)||0});
+        editor.items.push({materialId:m.id, codigo:m.codigo, nombre:nombreCom(m), nombreInv:m.nombreInv||"",
+          especificacion:m.especificacion, unidad:m.unidad, cantidad:1, precio:Number(m.precio)||0});
       });
       render();
       return true;
@@ -1522,12 +1536,12 @@ function previaCatalogo(inc){
   const porCat = {};
   inc.forEach(m=>{ const k = m.categoria||"Otros"; (porCat[k]=porCat[k]||[]).push(m); });
   return Object.keys(porCat).sort((a,b)=>a.localeCompare(b,"es")).map(cat=>{
-    const lista = porCat[cat].slice().sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),"es")).slice(0,12);
+    const lista = porCat[cat].slice().sort((a,b)=>nombreCom(a).localeCompare(nombreCom(b),"es")).slice(0,12);
     return '<div style="margin-bottom:16px"><div class="catband" style="margin-bottom:10px">'+esc(cat)+'</div>'
     + '<div class="catgrid">' + lista.map(m=>
         '<div class="catcard">'
         + (FOTOS[m.id] ? '<img class="im" src="'+FOTOS[m.id]+'" alt="">' : '<div class="im-ph">sin foto</div>')
-        + '<div class="nm">'+esc(m.nombre)+'</div>'
+        + '<div class="nm">'+esc(nombreCom(m))+'</div>'
         + '<div class="sp">'+specLineas(m).map(esc).join("<br>")+'</div>'
         + '<div class="pr">'+usd(m.precio)+'</div></div>').join("")
     + '</div>'
@@ -1568,8 +1582,8 @@ function cxCatalogo(){
   document.getElementById("btnCsvCat").onclick = async ()=>{
     const m = materialesCatalogo();
     if (!m.length){ toast("No hay materiales seleccionados."); return; }
-    const filas = [["Codigo","Material","Especificaciones","Categoria","Unidad","Precio USD"]]
-      .concat(m.map(x=>[x.codigo, x.nombre, specLineas(x).join(" | "), x.categoria, x.unidad, String(x.precio)]));
+    const filas = [["Codigo","Nombre en inventario","Nombre comercial","Especificaciones","Categoria","Unidad","Costo USD","Precio USD"]]
+      .concat(m.map(x=>[x.codigo, x.nombreInv||"", nombreCom(x), specLineas(x).join(" | "), x.categoria, x.unidad, String(x.costo||0), String(x.precio)]));
     const csv = "﻿" + filas.map(f=>f.map(v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"').join(";")).join("\r\n");
     await descargar("Catalogo-"+hoy()+".csv", new Blob([csv], {type:"text/csv"}));
   };
